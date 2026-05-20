@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Soft light-blue background for a more human, friendly look */
+  background: #e6f7ff;
+  color: #0f172a; /* dark text for readability on light background */
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
