@@ -63,6 +63,10 @@ Create a `.env.local` file inside the `frontend/` directory with the following k
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
+# OneSignal Configuration
+NEXT_PUBLIC_ONESIGNAL_APP_ID=your_onesignal_app_id
+ONESIGNAL_REST_API_KEY=your_onesignal_rest_api_key
+
 # Razorpay Configuration (Public keys for frontend modal, private for backend verification)
 NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_xxxxxx
 RAZORPAY_KEY_ID=rzp_test_xxxxxx
@@ -87,10 +91,23 @@ npm run dev
 ```
 The application will start on [http://localhost:3000](http://localhost:3000).
 
+### 5. Supabase Realtime Setup
+To enable instantaneous, real-time driver dashboard updates, you must configure Postgres replication for the `orders` table. Run the following command in the **SQL Editor** of your Supabase dashboard:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+```
+
 ---
 
 ## 🧪 Crucial Implementations & Reliability Handlers
 
+*   **Chronological Order & Notification Workflow:** Restricts driver notifications and order claims to ensure food is accepted by the restaurant before delivery begins:
+    *   *New Order:* Placed silently (no driver alert).
+    *   *Preparing (Acceptance):* Triggers notification to drivers (*"New Order Preparing"*) and customer (*"Food is being prepared"*). Only orders in `Preparing` or `Ready` statuses appear on the driver dashboard.
+    *   *Ready (Prepared):* Triggers customer notification (*"Food is prepared"*).
+    *   *In Transit (Claimed):* Triggers customer notification (*"Driver is on the way"*).
+    *   *Delivered (Fulfillment):* Triggers customer notification (*"Order has been delivered"*).
+*   **OneSignal React Provider & Auth Sync:** Utilizes an initialization promise guard to prevent double-initialization in React StrictMode/Turbopack development environments and maps Supabase session user IDs to OneSignal device profiles securely.
 *   **Float Inaccuracies Handled:** Prevented Razorpay `BAD_REQUEST_ERROR: The amount must be an integer` when totals include decimal values. Cart totals are converted securely using `Math.round(amount * 100)` to guarantee clean integer (paise) inputs.
 *   **Node.js Runtime Target:** Enforced `export const runtime = "nodejs"` on backend payment handlers to ensure compatibility with Node-native cryptographics (`crypto`) and server communication, avoiding edge runtime compilation errors.
 *   **Checkout Dismissal Safety:** Configured the frontend checkout modal with a `modal.ondismiss` hook. If a customer exits the payment modal midway, the UI is properly notified and resets the loading state, allowing the user to select another method.
