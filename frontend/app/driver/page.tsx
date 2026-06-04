@@ -101,13 +101,13 @@ export default function DriverPage() {
   const [loading, setLoading] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
   const [earnings, setEarnings] = useState(0);
-  const [onlineHours, setOnlineHours] = useState(6.2); // Static metric or derived as placeholder
+  const [onlineHours, setOnlineHours] = useState(1); // Static metric or derived as placeholder
 
   const fetchDriverData = async (userId: string) => {
     try {
       setLoading(true);
 
-      // 1. Fetch available orders (New, Preparing, Dispatched, and no driver) 
+      // 1. Fetch available orders (Preparing, Ready and no driver) 
       // AND active orders assigned to this driver
       const { data: ordersData } = await supabase
         .from("orders")
@@ -120,7 +120,7 @@ export default function DriverPage() {
           store_id,
           driver_id
         `)
-        .or(`driver_id.eq.${userId},and(driver_id.is.null,status.in.(New,Preparing,Ready,Dispatched))`);
+        .or(`driver_id.eq.${userId},and(driver_id.is.null,status.in.(Preparing,Ready))`);
 
       if (ordersData) {
         const storeIds = Array.from(new Set(ordersData.map((o) => o.store_id)));
@@ -254,7 +254,7 @@ export default function DriverPage() {
     };
   }, []);
 
-  // Real-time subscription to orders updates
+  // Real-time subscription to orders updates + polling fallback
   useEffect(() => {
     if (!user) return;
 
@@ -269,8 +269,14 @@ export default function DriverPage() {
       )
       .subscribe();
 
+    // Fallback polling every 10 seconds in case Postgres replication is disabled
+    const interval = setInterval(() => {
+      fetchDriverData(user.id);
+    }, 10000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [user]);
 
@@ -308,6 +314,23 @@ export default function DriverPage() {
 
     if (!data || data.length === 0) {
       alert("Too slow! This order has already been accepted by another driver.");
+    } else {
+      const order = data[0];
+      if (order.customer_id) {
+        try {
+          await fetch("/api/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userIds: [order.customer_id],
+              title: "Order Dispatched! 🚴",
+              message: "A delivery partner has accepted your order and is on the way!"
+            })
+          });
+        } catch (err) {
+          console.error("Failed to notify customer of assignment:", err);
+        }
+      }
     }
 
     fetchDriverData(user.id);
@@ -320,15 +343,33 @@ export default function DriverPage() {
       nextStatus = "In Transit";
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("orders")
       .update({
         status: nextStatus
       })
-      .eq("id", orderId);
+      .eq("id", orderId)
+      .select();
     
     if (!error) {
       fetchDriverData(user.id);
+      if (data && data.length > 0 && data[0].customer_id) {
+        try {
+          await fetch("/api/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userIds: [data[0].customer_id],
+              title: nextStatus === "Delivered" ? "Order Delivered! 🎉" : "Order In Transit! 🚴",
+              message: nextStatus === "Delivered" 
+                ? "Your order has been delivered successfully. Enjoy your meal!" 
+                : "Your delivery partner has picked up your food and is on the way."
+            })
+          });
+        } catch (err) {
+          console.error("Failed to notify customer of status update:", err);
+        }
+      }
     } else {
       alert("Failed to update status: " + error.message);
     }

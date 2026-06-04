@@ -43,13 +43,50 @@ export default function TrackOrdersPage() {
   }, [storeId]);
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    // Find order to get customer_id
+    const order = orders.find(o => o.id === orderId);
+
     // Optimistic UI update
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     
-    await supabase
+    const { error } = await supabase
       .from('orders')
       .update({ status: newStatus })
       .eq('id', orderId);
+
+    if (!error && order && order.customer_id) {
+      try {
+        // 1. Notify the customer of order status
+        await fetch("/api/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userIds: [order.customer_id],
+            title: `Order Status: ${newStatus} 🍕`,
+            message: newStatus === "Preparing" 
+              ? "Your food is being prepared in the kitchen!" 
+              : newStatus === "Ready" 
+              ? "Your order has been prepared! A delivery partner is picking it up."
+              : `Your order status has been updated to ${newStatus.toLowerCase()}.`
+          })
+        });
+
+        // 2. If transitioning to "Preparing", notify all drivers that a new order is preparing and available soon
+        if (newStatus === "Preparing") {
+          await fetch("/api/notifications", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: "New Order Preparing! 🍔",
+              message: "An order is currently being prepared and will be ready for pickup soon.",
+              url: "/driver"
+            })
+          });
+        }
+      } catch (err) {
+        console.error("Failed to process notifications:", err);
+      }
+    }
   };
 
   return (
