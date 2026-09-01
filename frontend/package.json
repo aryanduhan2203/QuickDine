@@ -8,13 +8,16 @@
     "start": "next start"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1075.0",
+    "@aws-sdk/client-sqs": "^3.1075.0",
+    "@aws-sdk/s3-request-presigner": "^3.1075.0",
     "@next/third-parties": "^16.2.7",
     "@supabase/supabase-js": "^2.105.4",
     "lucide-react": "^1.16.0",
-    "next": "^16.2.6",
+    "next": "^16.2.9",
     "razorpay": "^2.9.6",
-    "react": "^19.2.6",
-    "react-dom": "^19.2.6",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "react-onesignal": "^3.5.5",
     "zod": "^4.4.3"
   },
