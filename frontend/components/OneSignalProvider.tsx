@@ -16,6 +16,14 @@ export default function OneSignalProvider({ children }: { children: React.ReactN
           return;
         }
 
+        const isLocalhost =
+          window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+        if (process.env.NODE_ENV !== "production" || isLocalhost) {
+          console.info("OneSignal initialization skipped in local development.");
+          return;
+        }
+
         // Prevent duplicate initialization calls in React StrictMode / hot-reloads
         if (!oneSignalInitPromise) {
           oneSignalInitPromise = OneSignal.init({
